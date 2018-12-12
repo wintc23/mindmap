@@ -208,14 +208,29 @@ export default {
         this.currentChoose = child
         this.currentChoose.classList.add('choose-node')
       })
-      // node.addEventListener('dblClick', (event) => {
-      //   let elment = document.createElement('textarea')
-      //   element.innerText = child.innerText
-      // })
+      node.addEventListener('dblclick', (event) => {
+        this.editNode(child)
+      })
+    },
+    editNode (element) {
+      element.style.userSelect = 'none'
+      element.__editing = true
+      element.setAttribute('contentEditable', true)
+      element.style.userSelect = 'text'
+      element.focus()
     },
     checkKeyPress (event) {
       console.log(event)
       if (!this.currentChoose) return
+      if (this.currentChoose.__editing) {
+        if (event.key === 'Enter') {
+          this.currentChoose.setAttribute('contentEditable', false)
+          this.currentChoose.__editing = false
+          this.currentChoose.parentNode.data.name = this.currentChoose.innerText
+          this.calNodePosition()
+        }
+        return
+      }
       let element = this.currentChoose.parentNode
       let data = element.data
       if (event.key === 'Tab') {
@@ -227,6 +242,7 @@ export default {
         child.element.click()
         this.calNodePosition()
         child.element.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' })
+        // this.editNode(child.element.querySelector('.mind-map-node-child'))
       } else if (event.key === 'Enter') {
         if (!data.parentData) return
         let brother = this.newNode()
@@ -236,6 +252,7 @@ export default {
         brother.element.click()
         this.calNodePosition()
         brother.element.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' })
+        // this.editNode(brother.element.querySelector('.mind-map-node-child'))
       } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         if (data.parentData) {
           let idx = data.parentData.children.findIndex(item => item === data)
@@ -258,7 +275,7 @@ export default {
       event.preventDefault()
     },
     newNode () {
-      let name = this.id % 2 === 0 ? '新节点' : '长的新节点的点点滴滴多多多多多多多多多多多多多多多多多多多多多多多多点'
+      let name = Math.random() < 0.5 ? '新节点' : '内容长长的新节点点点点点点点点点点点点点点点点点点点点点点点点点点点点点点点点点点点点点点点'
       return {
         id: this.id++,
         name
@@ -306,7 +323,11 @@ export default {
     margin .5rem 1.5rem
     box-shadow 0 0 1px 1px #3361D8
     &.choose-node
+      position relative
+      background rgba(255, 255, 255, 1)
+      z-index 1
       box-shadow 0 0 1px 2px #3361D8
+
 svg
   position absolute
 </style>
