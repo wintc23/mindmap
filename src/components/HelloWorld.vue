@@ -1,6 +1,6 @@
 <template>
   <div class="root">
-    <div class="map-tree">
+    <div class="map-tree" v-show="false">
       <Button type="success" @click.stop="calNodePosition()">渲染</Button>
       <!-- <Button type="success" @click.stop="drawCurve()">贝塞尔</Button> -->
       <simple-tree
@@ -67,22 +67,29 @@ export default {
   },
   mounted () {
     document.addEventListener('keydown', this.checkKeyPress)
+    this.calNodePosition()
+    this.treeData[0].element.click()
   },
   beforeDestroy () {
     document.removeEventListener('keydown', this.checkKeyPress)
   },
   methods: {
-    drawCurve (x = 0, y = 0) {
-      let svg = this.createCurve(100, 150, 1)
-      svg.style.top = y + 'px'
-      svg.style.left = x + 'px'
-    },
     createCurve (width, height, k = -1) {
       let svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      svg.style.position = 'absolute'
+      let path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      let d = ''
+      if (k < 0) {
+        d = `M0,0 C${width/2},0 ${width/2},${height} ${width},${height}`
+      } else if (k > 0) {
+        d = `M0,${height} C${width/2},${height}, ${width/2},0 ${width},0`
+      } else {
+        d = `M0,0 L${width},0`
+        height = 2
+        path.setAttribute('stroke-width', '3')
+      }
       svg.setAttribute('width', width)
       svg.setAttribute('height', height)
-      let path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-      let d = k < 0 ? `M0,0 C${width/2},0 ${width/2},${height} ${width},${height}` : `M0,${height} C${width/2},${height}, ${width/2},0 ${width},0`
       path.setAttribute('d', d)
       path.setAttribute('stroke', 'black')
       path.setAttribute('fill', 'none')
@@ -93,7 +100,8 @@ export default {
     calNodePosition () {
       this.createElements(this.treeData)
       this.calBoxPosition(this.treeData)
-      this.fixPosition(this.treeData, 0, 0)
+      this.fixPosition(this.treeData)
+      console.table(this.treeData)
     },
     createElements (treeData) {
       for (let data of treeData) {
@@ -112,16 +120,11 @@ export default {
         data.element.style.position = 'absolute'
         data.element.classList.add('mind-map-node')
         let child = document.createElement('div')
-        // child.style.padding = '4px .5rem'
-        // child.style.borderRadius = '2px'
-        // child.style.margin = '.5rem'
-        // child.style.boxShadow = '0 0 1px 1px #3361D8'
         child.classList.add('mind-map-node-child')
         data.element.appendChild(child)
         data.element.data = data
-        data.element.style.opacity = 0
         this.$refs.mindmap.appendChild(data.element)
-        this.addNodeEventListener(child)
+        this.addNodeEventListener(data.element)
       }
       let child = data.element.querySelector('.mind-map-node-child')
       child.innerText = data.name
@@ -129,6 +132,14 @@ export default {
     calBoxPosition (treeData) {
       for (let data of treeData) {
         let rect = data.element.getBoundingClientRect()
+        let child = data.element.querySelector('.mind-map-node-child')
+        let childRect = child.getBoundingClientRect()
+        data.width = rect.width
+        data.height = rect.height
+        data.leftX = childRect.left - rect.left
+        data.leftY = childRect.top - rect.top + childRect.height / 2
+        data.rightX = childRect.left - rect.left + childRect.width
+        data.rightY = data.leftY
         if (data.children) {
           this.calBoxPosition(data.children)
           let height = 0
@@ -137,53 +148,70 @@ export default {
             width = Math.max(item.boxWidth, width)
             height += item.boxHeight
           })
-          data.boxWidth = width + rect.width
+          data.boxWidth = width + data.width
           data.boxHeight = height
         } else {
-          data.boxWidth = rect.width
-          data.boxHeight = rect.height
+          data.boxWidth = data.width
+          data.boxHeight = data.height
         }
       }
     },
-    fixPosition (treeData, top, left) {
-      let childTop = top
-      for (let data of treeData) {
-        let rect = data.element.getBoundingClientRect()
-        // console.log(childTop + (data.boxHeight - rect.height) / 2)
-        data.left = left
-        data.top = childTop + (data.boxHeight - rect.height) / 2
-        data.element.style.left = data.left + 'px'
-        data.element.style.top = data.top + 'px'
-        data.element.style.opacity = 1
+    fixPosition (treeData) {
+      let len = treeData.length
+      for (let i = 0; i < len; i++) {
+        let data = treeData[i]
+        data.boxTop = 0
+        data.top = (data.boxHeight - data.height) / 2
+        if (i === 0) {
+          if (data.parentData) {
+            data.top = data.parentData.boxTop + data.top
+            data.boxTop = data.parentData.boxTop
+          }
+        } else {
+          let bro = treeData[i-1]
+          data.top = bro.boxTop + bro.boxHeight + data.top
+          data.boxTop = bro.boxTop + bro.boxHeight
+        }
+        if (data.parentData) {
+          data.left = data.parentData.left + data.parentData.width
+        } else {
+          data.left = 0
+        }
         if (data.children) {
-          this.fixPosition(data.children, childTop, left + rect.width)
+          this.fixPosition(data.children)
           for (let child of data.children) {
-            let childRect = child.element.getBoundingClientRect()
-            let width = 48
-            let height = Math.abs(child.top - data.top)
-            let svgTop = Math.min(data.top + rect.height /2, child.top + childRect.height/2) 
-            let svgLeft = data.left + rect.width - 24
             if (child.svg) {
               child.svg.parentNode.removeChild(child.svg)
             }
-            console.log(width, height, child.top, data.top, data.left)
-            child.svg = this.createCurve(width, height, (data.top + rect.height /2) - (child.top + childRect.height/2))
-            child.svg.style.top = svgTop + 'px'
-            child.svg.style.left = svgLeft + 'px'
-            child.svg.style.position = 'absolute'
+            let width = (child.left + child.leftX) - (data.left + data.rightX)
+            let height = (child.top + child.leftX) - (data.top + data.leftX)
+            let absHeight = height ? Math.abs(height) : 2
+            child.svg = this.createCurve(width, absHeight, -height)
+            if (height) {
+              child.svg.style.top = Math.round(height < 0 ? (child.top + child.leftX) : (data.top + data.leftX)) + 'px'
+            } else {
+              child.svg.style.top = Math.round(child.top + child.leftX - 1) + 'px'
+            }
+            child.svg.style.left = Math.round(data.left + data.rightX) + 'px'
           }
         }
-        childTop += data.boxHeight
+        data.element.style.top = Math.round(data.top) + 'px'
+        data.element.style.left = Math.round(data.left) + 'px'
       }
     },
     addNodeEventListener (node) {
+      let child = node.querySelector('.mind-map-node-child')
       node.addEventListener('click', (event) => {
         if (this.currentChoose) {
           this.currentChoose.classList.remove('choose-node')
         }
-        this.currentChoose = node
+        this.currentChoose = child
         this.currentChoose.classList.add('choose-node')
       })
+      // node.addEventListener('dblClick', (event) => {
+      //   let elment = document.createElement('textarea')
+      //   element.innerText = child.innerText
+      // })
     },
     checkKeyPress (event) {
       console.log(event)
@@ -192,24 +220,48 @@ export default {
       let data = element.data
       if (event.key === 'Tab') {
         let child = this.newNode()
-        data.children = data.children || []
+        let children = data.children || []
+        this.$set(data, 'children', children)
         data.children.push(child)
         this.createElement(child)
+        child.element.click()
+        this.calNodePosition()
+        child.element.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' })
       } else if (event.key === 'Enter') {
+        if (!data.parentData) return
         let brother = this.newNode()
-        data.parentData.children.push(brother)
+        let idx = data.parentData.children.findIndex(item => item === data)
+        data.parentData.children.splice(idx + 1, 0, brother)
         this.createElement(brother)
+        brother.element.click()
+        this.calNodePosition()
+        brother.element.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' })
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        if (data.parentData) {
+          let idx = data.parentData.children.findIndex(item => item === data)
+          let choose
+          if (event.key === 'ArrowUp' && idx > 0) {
+            choose = data.parentData.children[idx - 1].element
+          } else if (event.key === 'ArrowDown' && idx < data.parentData.children.length - 1) {
+            console.log(idx, data.parentData.children.length)
+            choose = data.parentData.children[idx + 1].element
+          }
+          choose && choose.click()
+        }
+      } else if (event.key === 'ArrowLeft') {
+        data.parentData && data.parentData.element.click()
+      } else if (event.key === 'ArrowRight') {
+        data.children && data.children.length && data.children[0].element.click()
       } else {
         return
       }
       event.preventDefault()
-      this.calNodePosition(this.treeData)
-      this.fixPosition(this.treeData)
     },
     newNode () {
+      let name = this.id % 2 === 0 ? '新节点' : '长的新节点的点点滴滴多多多多多多多多多多多多多多多多多多多多多多多多点'
       return {
         id: this.id++,
-        name: '新节点'
+        name
       }
     }
   }
@@ -248,6 +300,7 @@ export default {
   position absolute
   // transition all .2s ease-in-out
   .mind-map-node-child
+    white-space nowrap
     padding 4px .5rem
     border-radius 2px
     margin .5rem 1.5rem
