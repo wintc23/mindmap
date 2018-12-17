@@ -27,7 +27,8 @@ export class NodeManager {
     for (let idx in this.manager) {
       // dom处理
       let data = this.manager[idx]
-      for (let element of data.dom) {
+      for (let idx in data.dom) {
+        let element = data.dom[idx]
         element.__nodeData = null
         element.parentNode.removeChild(element)
       }
@@ -45,8 +46,12 @@ export class NodeManager {
     this.options = null
   }
   render () {
+    console.time('calPosition')
     this.calBoxPosition()
+    console.timeEnd('calPosition')
+    console.time('fixPosition')
     this.fixPosition()
+    console.timeEnd('fixPosition')
   }
   calBoxPosition (node) {
     node = node || this.getRootManageData()
@@ -86,7 +91,6 @@ export class NodeManager {
       let node = nodeList[i]
       let parentNode = this.getParentManageData(node.data.id)
       node.position.top = (node.position.boxHeight - node.position.height) / 2
-      console.log(node.position.top, '~~~~~~~1')
       node.position.boxTop = 0
       if (i === 0) {
         if (parentNode) {
@@ -124,7 +128,6 @@ export class NodeManager {
         }
       }
       window.requestAnimationFrame(() => {
-        console.log(node.position.top)
         node.dom.element.style.top = Math.round(node.position.top) + 'px'
         node.dom.element.style.left = Math.round(node.position.left) + 'px'
       })
@@ -235,7 +238,7 @@ export class NodeManager {
     }
     return lst
   }
-  addNode (data, className) {
+  addNode (data) {
     this.generateManageData(data)
     this.manager[data.parentId] && this.manager[data.parentId].children.push(data)
     this.treeData.push(data)
