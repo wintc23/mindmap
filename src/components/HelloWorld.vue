@@ -1,7 +1,11 @@
 <template>
   <div class="root">
-    <div class="map-tree" v-show="false">
+    <div>
+      <input type="number" v-model="nodeNum" />
+      <button @click.stop="generateData">生成节点</button>
       <Button type="success" @click.stop="calNodePosition()">渲染</Button>
+    </div>
+    <div class="map-tree" v-show="false">
       <!-- <Button type="success" @click.stop="drawCurve()">贝塞尔</Button> -->
       <simple-tree
         class="tree"
@@ -16,6 +20,7 @@
 </template>
 
 <script>
+import { NodeManager } from './manager'
 export default {
   name: 'HelloWorld',
   props: {
@@ -23,6 +28,7 @@ export default {
   },
   data () {
     return {
+      nodeNum: '',
       treeData: [
         {
           name: 'hello',
@@ -65,15 +71,65 @@ export default {
       id: 100
     }
   },
+  created () {
+    // 
+  },
   mounted () {
-    document.addEventListener('keydown', this.checkKeyPress)
-    this.calNodePosition()
-    this.treeData[0].element.click()
+    this.manager = new NodeManager()
+    let data = this.manager.generateFake(100)
+    this.manager.proxy(this.$refs.mindmap, data)
+    // document.addEventListener('keydown', this.checkKeyPress)
+    // this.calNodePosition()
+    // this.treeData[0].element.click()
   },
   beforeDestroy () {
+    if (this.manager) {
+      this.manager.destory()
+    }
     document.removeEventListener('keydown', this.checkKeyPress)
   },
   methods: {
+    generateData () {
+      let nodeTitle = [
+        '新节点',
+        '新节点2',
+        '新节点3',
+        '新节点4',
+        '新节点5',
+        '新节点6',
+        '新节点7',
+        '新节点8',
+        '新节点9',
+        '新节点10',
+        '新节点11',
+        '新节点12',
+        '新节点13',
+      ]
+      let tmpMap = new Map()
+      this.treeData = []
+      for (let i = 0; i < this.nodeNum; i++) {
+        let data = {
+          id: i,
+          name: nodeTitle[Math.round(Math.random() * 10)],
+          children: []
+        }
+        tmpMap.set(i, data)
+        if (i === 0) {
+          this.treeData.push(data)
+        } else {
+          let parentId = Math.floor(Math.random() * i)
+          let parentNode = tmpMap.get(parentId)
+          if (!parentNode) {
+            console.log('未找到父节点', parentId, i)
+          } else {
+            parentNode.children.push(data)
+          }
+        }
+        if (i % 100 === 0) {
+          console.log(i, 'done')
+        }
+      }
+    },
     createCurve (width, height, k = -1) {
       let svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
       svg.style.position = 'absolute'
@@ -101,7 +157,6 @@ export default {
       this.createElements(this.treeData)
       this.calBoxPosition(this.treeData)
       this.fixPosition(this.treeData)
-      console.table(this.treeData)
     },
     createElements (treeData) {
       for (let data of treeData) {
@@ -260,7 +315,6 @@ export default {
           if (event.key === 'ArrowUp' && idx > 0) {
             choose = data.parentData.children[idx - 1].element
           } else if (event.key === 'ArrowDown' && idx < data.parentData.children.length - 1) {
-            console.log(idx, data.parentData.children.length)
             choose = data.parentData.children[idx + 1].element
           }
           choose && choose.click()
