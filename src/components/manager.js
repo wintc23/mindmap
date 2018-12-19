@@ -16,8 +16,13 @@ export class NodeManager {
     this.manager = {}
     this.treeData.forEach(item => this.generateManageData(item))
     this.treeData.forEach(item => {
+      let node = this.getManageDataById(item.id)
       if (this.manager[item.parentId]) {
-        this.manager[item.parentId].children.push(item)
+        let parentNode = this.getParentManageData(item.id)
+        parentNode.dom.container.appendChild(node.dom.container)
+        parentNode.children.push(item)
+      } else {
+        this.$el.appendChild(node.dom.container)
       }
     })
     this.render()
@@ -25,7 +30,6 @@ export class NodeManager {
   releaseResource () {
     if (!this.manager) return
     for (let idx in this.manager) {
-      // dom处理
       let data = this.manager[idx]
       for (let idx in data.dom) {
         let element = data.dom[idx]
@@ -47,13 +51,22 @@ export class NodeManager {
   }
   render () {
     console.time('calPosition')
-    this.calBoxPosition()
+    let list = []
+    this.calBoxPosition(null, list)
+    window.requestAnimationFrame(() => {
+      list.forEach((item) => {
+        // console.log(item, '~~~~~~~~~~~~')
+        item[0].style.top = item[1] + 'px'
+        item[0].style.left = item[2] + 'px'
+      })
+    })
     console.timeEnd('calPosition')
     console.time('fixPosition')
-    this.fixPosition()
+    // this.fixPosition()
     console.timeEnd('fixPosition')
   }
-  calBoxPosition (node) {
+  calBoxPosition (node, list) {
+    list = list || []
     node = node || this.getRootManageData()
     let rect = node.dom.element.getBoundingClientRect()
     let child = node.dom.element.firstChild
@@ -67,23 +80,25 @@ export class NodeManager {
       rightY: childRect.top - rect.top + childRect.height / 2
     }
     if (node.children.length) {
-      for (let childNode of node.children) {
-        this.calBoxPosition(this.getManageDataById(childNode.id))
-      }
-      let height = 0
+      let top = 0
       let width = 0
-      node.children.forEach(item => {
-        let child = this.getManageDataById(item.id)
-        width = Math.max(child.position.boxWidth, width)
-        height += child.position.boxHeight
-      })
-      node.position.boxWidth = width + node.position.width
-      node.position.boxHeight = height
+      for (let childData of node.children) {
+        let childNode = this.getManageDataById(childData.id)
+        this.calBoxPosition(childNode, list)
+        list.push([childNode.dom.container, node.position.width, top])
+        top += childNode.position.boxHeight
+        width = Math.max(childNode.position.boxWidth, width)
+      }
+      node.position.boxWidth = width + node.position.boxWidth
+      node.position.boxHeight = top
+      list.push([node.dom.element, (node.position.boxHeight - node.position.height) / 2, 0])
     } else {
       node.position.boxWidth = node.position.width
       node.position.boxHeight = node.position.height
+      list.push([node.dom.element, 0, 0])
     }
   }
+
   fixPosition (nodeList) {
     nodeList = nodeList || [this.getRootManageData()]
     let len = nodeList.length
@@ -168,7 +183,9 @@ export class NodeManager {
   }
   createElement (id) {
     let dom = this.manager[id].dom
-    if (!dom.element) {
+    if (!dom.container) {
+      dom.container = document.createElement('div')
+      dom.container.style.position = 'absolute'
       dom.element = document.createElement('div')
       dom.element.style.position = 'absolute'
       dom.element.classList.add(this.options.elementClass)
@@ -177,7 +194,7 @@ export class NodeManager {
       dom.element.appendChild(child)
       dom.element.__nodeData = this.manager[id].data
       child.__nodeData = this.manager[id].data
-      this.$el.appendChild(dom.element)
+      dom.container.appendChild(dom.element)
     }
     dom.element.firstChild.innerText = this.manager[id].data.name
   }
